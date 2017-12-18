@@ -1,3 +1,4 @@
+import xlwt
 import pickle
 import itertools
 import nltk
@@ -11,6 +12,8 @@ from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
+pos_f = 'pkl_data/2000/pos_review.pkl'
+neg_f = 'pkl_data/2000/neg_review.pkl'
 
 # 1 提取特征方法
 # 1.1 把所有词作为特征
@@ -20,6 +23,7 @@ def bag_of_words(words):
 
 # 1.2 把双词搭配（bigrams）作为特征
 def bigram(words, score_fn=BigramAssocMeasures.chi_sq, n=1000):
+
     bigram_finder = BigramCollocationFinder.from_words(words)  # 把文本变成双词搭配的形式
     bigrams = bigram_finder.nbest(score_fn, n)  # 使用了卡方统计的方法，选择排名前1000的双词
 
@@ -28,18 +32,24 @@ def bigram(words, score_fn=BigramAssocMeasures.chi_sq, n=1000):
 
 # 1.3 把所有词和双词搭配一起作为特征
 def bigram_words(words, score_fn=BigramAssocMeasures.chi_sq, n=1000):
-    bigram_finder = BigramCollocationFinder.from_words(words)
-    bigrams = bigram_finder.nbest(score_fn, n)
 
-    return bag_of_words(words + bigrams)  # 所有词和（信息量大的）双词搭配一起作为特征
+    tuple_words = []
+    for i in words:
+        temp = (i,)
+        tuple_words.append(temp)
+
+    bigram_finder = BigramCollocationFinder.from_words(words)
+    bigrams = bigram_finder.nbest(score_fn, n) # 使用了卡方统计的方法，选择排名前1000的双
+
+    return bag_of_words(tuple_words + bigrams)  # 所有词和（信息量大的）双词搭配一起作为特征
 
 
 # 2 特征选择方法
 # 2.1 计算出整个语料里面每个词的信息量
 # 2.1.1 计算整个语料里面每个词的信息量
 def create_word_scores():
-    posWords = pickle.load(open('pos_review.pkl', 'rb'))
-    negWords = pickle.load(open('neg_review.pkl', 'rb'))
+    posWords = pickle.load(open(pos_f, 'rb'))
+    negWords = pickle.load(open(neg_f, 'rb'))
 
     posWords = list(itertools.chain(*posWords))  # 把多维数组解链成一维数组
     negWords = list(itertools.chain(*negWords))  # 同理
@@ -70,8 +80,8 @@ def create_word_scores():
 
 # 2.1.2 计算整个语料里面每个词和双词搭配的信息量
 def create_word_bigram_scores():
-    posdata = pickle.load(open('pos_review.pkl', 'rb'))
-    negdata = pickle.load(open('neg_review.pkl', 'rb'))
+    posdata = pickle.load(open(pos_f, 'rb'))
+    negdata = pickle.load(open(neg_f, 'rb'))
 
     posWords = list(itertools.chain(*posdata))
     negWords = list(itertools.chain(*negdata))
@@ -99,7 +109,7 @@ def create_word_bigram_scores():
 
     word_scores = {}
     for word, freq in word_fd.items():
-        pos_score = BigramAssocMeasures.chi_sq(cond_word_fd['pos'][word], (freq, pos_word_count), total_word_count)
+        pos_score = BigramAssocMeasures.chi_sq(cond_word_fd['pos'][word], (freq, pos_word_count), total_word_count)  # 计算积极词的卡方统计量，这里也可以计算互信息等其它统计量
         neg_score = BigramAssocMeasures.chi_sq(cond_word_fd['neg'][word], (freq, neg_word_count), total_word_count)
         word_scores[word] = pos_score + neg_score
 
@@ -114,7 +124,7 @@ def find_best_words(word_scores, number):
 
 
 # 2.3 把选出的这些词作为特征（这就是选择了信息量丰富的特征）
-def best_word_features(words, best_words):
+def best_word_features(words):
     return dict([(word, True) for word in words if word in best_words])
 
 
@@ -126,27 +136,28 @@ neg_review = []  # 消极数据
 # 3.1 载入数据
 def load_data():
     global pos_review, neg_review
-    pos_review = pickle.load(open('pos_review.pkl', 'rb'))
-    neg_review = pickle.load(open('neg_review.pkl', 'rb'))
+    pos_review = pickle.load(open(pos_f, 'rb'))
+    neg_review = pickle.load(open(neg_f, 'rb'))
 
 
 # 3.2 使积极文本的数量和消极文本的数量一样 (跳过)
 
 # 3.3 赋予类标签
 # 3.3.1 积极
-def pos_features(feature_extraction_method, best_words):
+def pos_features(feature_extraction_method):
     posFeatures = []
     for i in pos_review:
-        posWords = [feature_extraction_method(i, best_words), 'pos']  # 为积极文本赋予"pos"
+        posWords = [feature_extraction_method(i), 'pos']  # 为积极文本赋予"pos"
         posFeatures.append(posWords)
     return posFeatures
 
 
 # 3.3.2 消极
-def neg_features(feature_extraction_method, best_words):
+def neg_features(feature_extraction_method):
+
     negFeatures = []
     for j in neg_review:
-        negWords = [feature_extraction_method(j, best_words), 'neg']  # 为消极文本赋予"neg"
+        negWords = [feature_extraction_method(j), 'neg']  # 为消极文本赋予"neg"
         negFeatures.append(negWords)
     return negFeatures
 
@@ -161,9 +172,11 @@ tag_dev = []
 # 3.4 把特征化之后的数据数据分割为开发集和测试集
 def cut_data(posFeatures, negFeatures):
     global train, devtest, test
-    train = posFeatures[174:] + negFeatures[174:]
-    devtest = posFeatures[124:174] + negFeatures[124:174]
-    test = posFeatures[:124] + negFeatures[:124]
+    # train = posFeatures[300:] + negFeatures[300:]
+    # devtest = posFeatures[300:500] + negFeatures[300:500]
+    # test = posFeatures[:500] + negFeatures[:500]
+    train = posFeatures[1500:] + negFeatures[1500:]
+    devtest = posFeatures[:500] + negFeatures[:500]
 
 
 # 4.1 开发测试集分割人工标注的标签和数据
@@ -183,44 +196,200 @@ def score(classifier):
     return accuracy_score(tag_dev, pred)  # 对比分类预测结果和人工标注的正确结果，给出分类器准确度
 
 
+def try_diffirent_classifiers():
+
+    results = list()
+    results.append(score(BernoulliNB()))
+    results.append(score(MultinomialNB()))
+    results.append(score(LogisticRegression()))
+    results.append(score(SVC()))
+    results.append(score(LinearSVC()))
+    results.append(score(NuSVC()))
+
+    return results
+
+
+best_words = []
+
+
 # 4.5 检验不同分类器和不同的特征选择的结果
 def compare_test():
-    global posFeatures, negFeatures
-    global pos_review, neg_review
 
-    word_scores_1 = create_word_scores()
-    word_scores_2 = create_word_bigram_scores()
-    best_words_1 = find_best_words(word_scores_1, 1500)
-    best_words_2 = find_best_words(word_scores_2, 1500)
+    global pos_review, neg_review
+    classifiers = ['BernoulliNB', 'MultinomiaNB', 'LogisticRegression', 'SVC', 'LinearSVC', 'NuSVC']
+
     load_data()
-    posFeatures = pos_features(best_word_features, best_words_1)  # 使用所有词作为特征
-    negFeatures = neg_features(best_word_features, best_words_1)
+
+    # 创建 xls 文件对象
+    wb = xlwt.Workbook()
+    # 新增一个表单
+    sh = wb.add_sheet('compare')
+    col_cnt = 0
+
+    # 使用所有词作为特征
+    posFeatures = pos_features(bag_of_words)
+    negFeatures = neg_features(bag_of_words)
+
     cut_data(posFeatures, negFeatures)
     cut_devtest()
-    # posFeatures = pos_features(bigram)
-    # negFeatures = neg_features(bigram)
 
-    # posFeatures = pos_features(bigram_words)
-    # negFeatures = neg_features(bigram_words)
+    sh.write(0, 0, '所有词')
+    col_cnt += 1
+    results = try_diffirent_classifiers()
+    temp = 0
+    for i in classifiers:
+        sh.write(col_cnt, 0, i)
+        sh.write(col_cnt, 1, results[temp])
+        col_cnt += 1
+        temp += 1
 
-    print('BernoulliNB`s accuracy is %f' % score(BernoulliNB()))
-    print('MultinomiaNB`s accuracy is %f' % score(MultinomialNB()))
-    print('LogisticRegression`s accuracy is %f' % score(LogisticRegression()))
-    print('SVC`s accuracy is %f' % score(SVC()))
-    print('LinearSVC`s accuracy is %f' % score(LinearSVC()))
-    print('NuSVC`s accuracy is %f' % score(NuSVC()))
+    # 使用双词搭配作为特征
+    posFeatures = pos_features(bigram)
+    negFeatures = neg_features(bigram)
+
+    cut_data(posFeatures, negFeatures)
+    cut_devtest()
+
+    col_cnt += 1
+    sh.write(col_cnt, 0, '双词搭配')
+    col_cnt += 1
+    results = try_diffirent_classifiers()
+    temp = 0
+    for i in classifiers:
+        sh.write(col_cnt, 0, i)
+        sh.write(col_cnt, 1, results[temp])
+        col_cnt += 1
+        temp += 1
+
+    # 使用所有词加上双词搭配作为特征
+    posFeatures = pos_features(bigram_words)
+    negFeatures = neg_features(bigram_words)
+
+    cut_data(posFeatures, negFeatures)
+    cut_devtest()
+
+    col_cnt += 1
+    sh.write(col_cnt, 0, '所有词和双词搭配')
+    col_cnt += 1
+    results = try_diffirent_classifiers()
+    temp = 0
+    for i in classifiers:
+        sh.write(col_cnt, 0, i)
+        sh.write(col_cnt, 1, results[temp])
+        col_cnt += 1
+        temp += 1
+
+    dimension = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500,
+                 9000]
+
+    row_cnt = 0
+    col_cnt += 1
+    sh.write(col_cnt, row_cnt, '信息量丰富的所有词')
+    row_cnt += 1
+    col_cnt += 1
+
+    temp = 0
+    temp_col = col_cnt
+    for i in classifiers:
+        col_cnt += 1
+        sh.write(col_cnt, 0, i)
+        temp += 1
+
+    # 计算信息量丰富的词，并以此作为分类特征
+    word_scores = create_word_scores()
+    for d in dimension:
+        col_cnt = temp_col
+        sh.write(col_cnt, row_cnt, d)
+        col_cnt += 1
+
+        global best_words
+        best_words = find_best_words(word_scores, int(d))  # 选择信息量最丰富的d个的特征
+
+        posFeatures = pos_features(best_word_features)
+        negFeatures = neg_features(best_word_features)
+
+        cut_data(posFeatures, negFeatures)
+        cut_devtest()
+
+        results = try_diffirent_classifiers()
+        temp = 0
+        for i in classifiers:
+            sh.write(col_cnt, row_cnt, results[temp])
+            col_cnt += 1
+            temp += 1
+        row_cnt += 1
+
+    row_cnt = 0
+    col_cnt += 1
+    sh.write(col_cnt, row_cnt, '信息量丰富的所有词和双词搭配')
+    row_cnt += 1
+    col_cnt += 1
+
+    temp = 0
+    temp_col = col_cnt
+    for i in classifiers:
+        col_cnt += 1x
+        sh.write(col_cnt, 0, i)
+        temp += 1
+
+    # 计算信息量丰富的词，并以此作为分类特征
+    word_scores = create_word_bigram_scores()
+    for d in dimension:
+        col_cnt = temp_col
+        sh.write(col_cnt, row_cnt, d)
+        col_cnt += 1
+
+        best_words = find_best_words(word_scores, int(d))  # 选择信息量最丰富的d个的特征
+
+        posFeatures = pos_features(best_word_features)
+        negFeatures = neg_features(best_word_features)
+
+        cut_data(posFeatures, negFeatures)
+        cut_devtest()
+
+        results = try_diffirent_classifiers()
+        temp = 0
+        for i in classifiers:
+            sh.write(col_cnt, row_cnt, results[temp])
+            col_cnt += 1
+            temp += 1
+        row_cnt += 1
+
+    # 保存文件
+    wb.save('example.xls')
+    # word_scores_1 = create_word_scores()
+    # word_scores_2 = create_word_bigram_scores()
+    # best_words_1 = find_best_words(word_scores_1, 5000)
+    # best_words_2 = find_best_words(word_scores_2, 5000)
+    # load_data()
+    # posFeatures = pos_features(best_word_features, best_words_2)  # 使用所有词作为特征
+    # negFeatures = neg_features(best_word_features, best_words_2)
+    # cut_data(posFeatures, negFeatures)
+    # cut_devtest()
+    # # posFeatures = pos_features(bigram)
+    # # negFeatures = neg_features(bigram)
+    #
+    # # posFeatures = pos_features(bigram_words)
+    # # negFeatures = neg_features(bigram_words)
+    #
+    # print('BernoulliNB`s accuracy is %f' % score(BernoulliNB()))
+    # print('MultinomiaNB`s accuracy is %f' % score(MultinomialNB()))
+    # print('LogisticRegression`s accuracy is %f' % score(LogisticRegression()))
+    # print('SVC`s accuracy is %f' % score(SVC()))
+    # print('LinearSVC`s accuracy is %f' % score(LinearSVC()))
+    # print('NuSVC`s accuracy is %f' % score(NuSVC()))
 
 
 # 5.1 使用测试集测试分类器的最终效果
 def use_the_best():
     word_scores = create_word_bigram_scores()  # 使用词和双词搭配作为特征
-    best_words = find_best_words(word_scores, 1500)  # 特征维度1500
+    best_words = find_best_words(word_scores, 4000)  # 特征维度1500
     load_data()
     posFeatures = pos_features(best_word_features, best_words)
     negFeatures = neg_features(best_word_features, best_words)
     cut_data(posFeatures, negFeatures)
-    trainSet = posFeatures[:500] + negFeatures[:500]  # 使用了更多数据
-    testSet = posFeatures[500:] + negFeatures[500:]
+    trainSet = posFeatures[1500:] + negFeatures[1500:]  # 使用了更多数据
+    testSet = posFeatures[:500] + negFeatures[:500]
     test, tag_test = zip(*testSet)
 
 
@@ -275,4 +444,5 @@ def application():
     p_file.close()
 
 if __name__ == '__main__':
-    use_the_best()
+    compare_test()
+
