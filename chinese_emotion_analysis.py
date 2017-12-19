@@ -12,8 +12,8 @@ from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
-pos_f = 'pkl_data/2000/pos_review.pkl'
-neg_f = 'pkl_data/2000/neg_review.pkl'
+pos_f = 'pkl_data/1000/pos_review.pkl'
+neg_f = 'pkl_data/1000/neg_review.pkl'
 
 # 1 提取特征方法
 # 1.1 把所有词作为特征
@@ -405,23 +405,25 @@ def use_the_best():
 
 # 5.3 把分类器存储下来（存储分类器和前面没有区别，只是使用了更多的训练数据以便分类器更为准确）
 def store_classifier():
+    load_data()
     word_scores = create_word_bigram_scores()
-    best_words = find_best_words(word_scores, 1500)
+    global best_words
+    best_words = find_best_words(word_scores, 7500)
 
     posFeatures = pos_features(best_word_features)
     negFeatures = neg_features(best_word_features)
 
     trainSet = posFeatures + negFeatures
 
-    BernoulliNB_classifier = SklearnClassifier(BernoulliNB())
-    BernoulliNB_classifier.train(trainSet)
-    pickle.dump(BernoulliNB_classifier, open('classifier.pkl', 'wb'))
+    MultinomialNB_classifier = SklearnClassifier(MultinomialNB())
+    MultinomialNB_classifier.train(trainSet)
+    pickle.dump(MultinomialNB_classifier, open('classifier.pkl', 'wb'))
 
 
 # 6 使用分类器进行分类，并给出概率值
 # 6.1 把文本变为特征表示的形式
 def transfer_text_to_moto():
-    moto = pickle.load(open('moto_senti_seg.pkl', 'rb'))  # 载入文本数据
+    moto = pickle.load(open('pkl_data/test/test_review.pkl', 'rb'))  # 载入文本数据
 
     def extract_features(data):
         feat = []
@@ -434,15 +436,18 @@ def transfer_text_to_moto():
 
 
 # 6.2 对文本进行分类，给出概率值
-def application():
+def application(moto_features):
     clf = pickle.load(open('classifier.pkl', 'rb'))  # 载入分类器
 
-    pred = clf.batch_prob_classify(transfer_text_to_moto())  # 该方法是计算分类概率值的
-    p_file = open('moto_ml_socre.txt', 'w')  # 把结果写入文档
+    pred = clf.prob_classify_many(moto_features)  # 该方法是计算分类概率值的
+    p_file = open('pkl_data/test/test_result.txt', 'w')  # 把结果写入文档
     for i in pred:
         p_file.write(str(i.prob('pos')) + ' ' + str(i.prob('neg')) + '\n')
     p_file.close()
 
 if __name__ == '__main__':
-    compare_test()
+    store_classifier()
+    moto_features = transfer_text_to_moto()
+    application(moto_features)
+
 
