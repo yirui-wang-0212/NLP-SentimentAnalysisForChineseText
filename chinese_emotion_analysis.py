@@ -2,6 +2,7 @@ import xlwt
 import pickle
 import itertools
 import nltk
+import os
 import sklearn
 from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
@@ -125,6 +126,10 @@ def find_best_words(word_scores, number):
 
 # 2.3 把选出的这些词作为特征（这就是选择了信息量丰富的特征）
 def best_word_features(words):
+    # load_data()
+    # word_scores = create_word_bigram_scores()
+    global best_words
+    # best_words = find_best_words(word_scores, 7500)
     return dict([(word, True) for word in words if word in best_words])
 
 
@@ -423,6 +428,7 @@ def store_classifier():
 # 6 使用分类器进行分类，并给出概率值
 # 6.1 把文本变为特征表示的形式
 def transfer_text_to_moto():
+
     moto = pickle.load(open('pkl_data/test/test_review.pkl', 'rb'))  # 载入文本数据
 
     def extract_features(data):
@@ -446,7 +452,25 @@ def application(moto_features):
     p_file.close()
 
 if __name__ == '__main__':
-    store_classifier()
+
+    # try:
+    #     clf = pickle.load(open('classifer.pkl', 'rb'))
+    # except FileNotFoundError:
+    # store_classifier()
+
+    # try:
+    #     best_words = pickle.load(open('best_words.pkl', 'rb'))
+    # except FileNotFoundError:
+    #     print('start creating best_words')
+    # load_data()
+    # word_scores = create_word_bigram_scores()
+    # best_words = find_best_words(word_scores, 7500)
+    # output = open('best_words.pkl', 'wb')
+    # pickle.dump(best_words, output)
+    # output.close()
+    #     print('end creating best_words')
+    #
+    best_words = pickle.load(open('best_words.pkl', 'rb'))
     moto_features = transfer_text_to_moto()
     application(moto_features)
 
