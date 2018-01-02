@@ -13,8 +13,8 @@ from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
-pos_f = 'pkl_data/1000/pos_review.pkl'
-neg_f = 'pkl_data/1000/neg_review.pkl'
+pos_f = '../pkl_data/1000/pos_review.pkl'
+neg_f = '../pkl_data/1000/neg_review.pkl'
 
 # 1 提取特征方法
 # 1.1 把所有词作为特征
@@ -361,7 +361,7 @@ def compare_test():
         row_cnt += 1
 
     # 保存文件
-    wb.save('example.xls')
+    wb.save('../out/compare.xls')
     # word_scores_1 = create_word_scores()
     # word_scores_2 = create_word_bigram_scores()
     # best_words_1 = find_best_words(word_scores_1, 5000)
@@ -422,14 +422,14 @@ def store_classifier():
 
     MultinomialNB_classifier = SklearnClassifier(MultinomialNB())
     MultinomialNB_classifier.train(trainSet)
-    pickle.dump(MultinomialNB_classifier, open('classifier.pkl', 'wb'))
+    pickle.dump(MultinomialNB_classifier, open('../out/classifier.pkl', 'wb'))
 
 
 # 6 使用分类器进行分类，并给出概率值
 # 6.1 把文本变为特征表示的形式
 def transfer_text_to_moto():
 
-    moto = pickle.load(open('pkl_data/test/test_review.pkl', 'rb'))  # 载入文本数据
+    moto = pickle.load(open('../pkl_data/test/test_review.pkl', 'rb'))  # 载入文本数据
 
     def extract_features(data):
         feat = []
@@ -443,10 +443,10 @@ def transfer_text_to_moto():
 
 # 6.2 对文本进行分类，给出概率值
 def application(moto_features):
-    clf = pickle.load(open('classifier.pkl', 'rb'))  # 载入分类器
+    clf = pickle.load(open('../out/classifier.pkl', 'rb'))  # 载入分类器
 
     pred = clf.prob_classify_many(moto_features)  # 该方法是计算分类概率值的
-    p_file = open('pkl_data/test/test_result.txt', 'w')  # 把结果写入文档
+    p_file = open('../out/test_result.txt', 'w')  # 把结果写入文档
     for i in pred:
         p_file.write(str(i.prob('pos')) + ' ' + str(i.prob('neg')) + '\n')
     p_file.close()
@@ -454,7 +454,7 @@ def application(moto_features):
 if __name__ == '__main__':
 
     # try:
-    #     clf = pickle.load(open('classifer.pkl', 'rb'))
+    #     clf = pickle.load(open('../classifer.pkl', 'rb'))
     # except FileNotFoundError:
     # store_classifier()
 
@@ -470,7 +470,8 @@ if __name__ == '__main__':
     # output.close()
     #     print('end creating best_words')
     #
-    best_words = pickle.load(open('best_words.pkl', 'rb'))
+    store_classifier()
+    # best_words = pickle.load(open('../out/best_words.pkl', 'rb'))
     moto_features = transfer_text_to_moto()
     application(moto_features)
 

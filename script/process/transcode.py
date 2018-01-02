@@ -2,7 +2,7 @@ import codecs
 import os
 
 BLOCKSIZE = 1048576
-FindPath = 'raw_data/3000/neg/'
+FindPath = '../../raw_data/3000/neg/'
 FileNames = os.listdir(FindPath)
 for file_name in FileNames:
     full_file_name = os.path.join(FindPath, file_name)
